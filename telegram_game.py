@@ -27,11 +27,8 @@ async def inline_query(update: Update, context):
 async def callback_query(update: Update, context):
     query = update.callback_query
     logger.info(f"Callback query received: {query.game_short_name}")
-    if query.game_short_name == GAME_SHORT_NAME:
-        await query.answer(url=GAME_URL)
-        logger.info(f"Answered callback query with game URL: {GAME_URL}")
-    else:
-        await query.answer(text="Sorry, game not found!")
+    await query.answer(url=GAME_URL)
+    logger.info(f"Answered callback query with game URL: {GAME_URL}")
 
 def main():
     logger.info("Starting bot...")
@@ -46,3 +43,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    
