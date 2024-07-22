@@ -11,7 +11,7 @@ GAME_URL = "https://rollingsloanetoken.github.io/telegram-app/"
 
 async def start(update: Update, context):
     logger.info("Start command received")
-    keyboard = [[InlineKeyboardButton("Play DogeFlyer", url=GAME_URL)]]
+    keyboard = [[InlineKeyboardButton("Play DogeFlyer", callback_game=GAME_SHORT_NAME)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Welcome to DogeFlyer! Click the button below to play:", reply_markup=reply_markup)
 
@@ -27,8 +27,11 @@ async def inline_query(update: Update, context):
 async def callback_query(update: Update, context):
     query = update.callback_query
     logger.info(f"Callback query received: {query.game_short_name}")
-    await query.answer(url=GAME_URL)
-    logger.info(f"Answered callback query with game URL: {GAME_URL}")
+    if query.game_short_name == GAME_SHORT_NAME:
+        await query.answer(url=GAME_URL)
+        logger.info(f"Answered callback query with game URL: {GAME_URL}")
+    else:
+        await query.answer(text="Sorry, game not found!")
 
 def main():
     logger.info("Starting bot...")
