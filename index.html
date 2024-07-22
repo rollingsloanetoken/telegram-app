@@ -6,7 +6,47 @@
     <title>DogeFlyer Game</title>
     <script src="https://telegram.org/js/games.js"></script>
     <style>
-        /* ... (previous styles remain the same) ... */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            touch-action: none;
+            width: 100%;
+            height: 100%;
+        }
+        #scoreModal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 300px;
+            text-align: center;
+            border-radius: 10px;
+        }
+        .modal-button {
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -15,8 +55,8 @@
         <div class="modal-content">
             <h2>Game Over!</h2>
             <p>Your score: <span id="finalScore"></span></p>
-            <button class="modal-button" id="restartButton">Retry</button>
-            <button class="modal-button" id="shareButton">Share Game</button>
+            <button class="modal-button" id="restartButton">Restart</button>
+            <button class="modal-button" id="shareButton">Share Score</button>
         </div>
     </div>
 
@@ -31,25 +71,35 @@
         // Check if running in Telegram
         const isTelegram = window.TelegramGameProxy !== undefined;
 
-        // ... (image loading code remains the same) ...
+        // Load images
+        const dogImage = new Image();
+        dogImage.src = 'dog-image.png';
 
-        let dog, obstacles, score, lastObstacleY, gameActive;
+        const skyImage = new Image();
+        skyImage.src = 'sky.jpg';
 
-        function initGame() {
-            dog = {
-                x: 50,
-                y: canvas.height / 2,
-                width: canvas.width * 0.2,
-                height: canvas.width * 0.2,
-                velocity: 0,
-                lift: -canvas.height * 0.015
-            };
-            obstacles = [];
-            score = 0;
-            lastObstacleY = 0;
-            gameActive = true;
-        }
+        const obstacleImages = [
+            new Image(),
+            new Image(),
+            new Image()
+        ];
+        obstacleImages[0].src = 'Happy.png';
+        obstacleImages[1].src = 'Angry.png';
+        obstacleImages[2].src = 'Bored.png';
 
+        // Game variables
+        let dog = {
+            x: 50,
+            y: canvas.height / 2,
+            width: 0,  // Will be set in resizeCanvas
+            height: 0, // Will be set in resizeCanvas
+            velocity: 0,
+            lift: -5
+        };
+
+        let obstacles = [];
+        let score = 0;
+        let lastObstacleY = 0;
         const gravity = 0.2;
         const obstacleSpeed = 2;
 
@@ -57,39 +107,117 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             
-            if (dog) {
-                dog.width = canvas.width * 0.2;
-                dog.height = dog.width;
-                dog.lift = -canvas.height * 0.015;
-                
-                if (dog.y + dog.height > canvas.height) {
-                    dog.y = canvas.height - dog.height;
-                }
+            // Adjust dog size based on canvas size
+            dog.width = canvas.width * 0.2;  // Increased from 0.15 to 0.2
+            dog.height = dog.width;
+            dog.lift = -canvas.height * 0.015;
+            
+            // Reposition dog if necessary
+            if (dog.y + dog.height > canvas.height) {
+                dog.y = canvas.height - dog.height;
             }
         }
 
         function gameLoop() {
-            if (gameActive) {
-                update();
-                draw();
-            }
+            update();
+            draw();
             requestAnimationFrame(gameLoop);
         }
 
         function update() {
-            // ... (update logic remains the same) ...
+            // Apply gravity
+            dog.velocity += gravity;
+            dog.y += dog.velocity;
+
+            // Keep dog within canvas
+            if (dog.y > canvas.height - dog.height) {
+                dog.y = canvas.height - dog.height;
+                dog.velocity = 0;
+            }
+            if (dog.y < 0) {
+                dog.y = 0;
+                dog.velocity = 0;
+            }
+
+            // Generate obstacles
+            if (obstacles.length === 0 || canvas.width - obstacles[obstacles.length - 1].x >= canvas.width * 0.4) {
+                obstacles.push(createObstacle());
+            }
+
+            // Move and remove obstacles
+            obstacles = obstacles.filter(obstacle => {
+                obstacle.x -= obstacleSpeed;
+
+                if (!obstacle.passed && obstacle.x + obstacle.width < dog.x) {
+                    obstacle.passed = true;
+                    score++;
+                }
+
+                if (obstacle.x + obstacle.width < 0) {
+                    return false;
+                }
+                return true;
+            });
+
+            // Check for collisions
+            obstacles.forEach(obstacle => {
+                if (
+                    dog.x < obstacle.x + obstacle.width &&
+                    dog.x + dog.width > obstacle.x &&
+                    dog.y < obstacle.y + obstacle.height &&
+                    dog.y + dog.height > obstacle.y
+                ) {
+                    gameOver();
+                }
+            });
         }
 
         function draw() {
-            // ... (draw logic remains the same) ...
+            // Draw sky background
+            ctx.drawImage(skyImage, 0, 0, canvas.width, canvas.height);
+
+            // Draw dog with improved quality
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(dogImage, dog.x, dog.y, dog.width, dog.height);
+
+            // Draw obstacles
+            obstacles.forEach(obstacle => {
+                ctx.drawImage(obstacle.image, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+
+            // Draw score
+            ctx.fillStyle = 'white';
+            ctx.font = `${canvas.width * 0.05}px Arial`;
+            ctx.fillText('Score: ' + score, 10, 30);
         }
 
         function createObstacle() {
-            // ... (obstacle creation logic remains the same) ...
+            const randomImage = obstacleImages[Math.floor(Math.random() * obstacleImages.length)];
+            const size = Math.random() * (canvas.height * 0.1) + (canvas.height * 0.05);
+            
+            const availableSpace = canvas.height - size;
+            const sectionHeight = availableSpace / 3;
+            
+            let section;
+            do {
+                section = Math.floor(Math.random() * 3);
+            } while (Math.abs(section * sectionHeight - lastObstacleY) < sectionHeight);
+            
+            const y = section * sectionHeight + Math.random() * (sectionHeight - size);
+            lastObstacleY = y;
+            
+            return {
+                x: canvas.width,
+                y: y,
+                width: size,
+                height: size,
+                image: randomImage,
+                passed: false
+            };
         }
 
         function gameOver() {
-            gameActive = false;
             finalScoreSpan.textContent = score;
             scoreModal.style.display = 'block';
             if (isTelegram) {
@@ -98,39 +226,36 @@
         }
 
         function resetGame() {
-            initGame();
+            dog.y = canvas.height / 2;
+            dog.velocity = 0;
+            obstacles = [];
+            score = 0;
+            lastObstacleY = 0;
             scoreModal.style.display = 'none';
         }
 
-        function shareGame() {
+        function shareScore() {
             if (isTelegram) {
                 TelegramGameProxy.shareScore();
             } else {
-                // Fallback for non-Telegram environments
-                alert("This game is designed to be played in Telegram.");
+                alert("Score sharing is only available in Telegram.");
             }
         }
 
+        // Event listeners
         canvas.addEventListener('click', function() {
-            if (gameActive) {
-                dog.velocity = dog.lift;
-            }
+            dog.velocity = dog.lift;
         });
 
         restartButton.addEventListener('click', resetGame);
-        shareButton.addEventListener('click', shareGame);
+        shareButton.addEventListener('click', shareScore);
 
         window.addEventListener('resize', resizeCanvas);
 
-        // Initialize and start the game
+        // Initialize
         resizeCanvas();
-        initGame();
+        // Start the game
         gameLoop();
-
-        // Telegram-specific initialization
-        if (isTelegram) {
-            TelegramGameProxy.initParams();
-        }
     </script>
 </body>
 </html>
