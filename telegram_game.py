@@ -1,30 +1,34 @@
 import logging
-from telegram import InlineQueryResultGame, Update
+from telegram import InlineQueryResultGame, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, InlineQueryHandler, CallbackQueryHandler
 
-# Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Bot token and game short name
 BOT_TOKEN = "6539738422:AAF8hDkjm86uOAZzbaT9zifMdWs7mSvXzCU"
 GAME_SHORT_NAME = "DogeFlyer"
+GAME_URL = "https://rollingsloanetoken.github.io/telegram-app/"
 
 async def start(update: Update, context):
     logger.info("Start command received")
-    await update.message.reply_text("Welcome to DogeFlyer! Use inline mode to share the game.")
+    keyboard = [[InlineKeyboardButton("Play DogeFlyer", callback_game=GAME_SHORT_NAME)]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Welcome to DogeFlyer! Click the button below to play:", reply_markup=reply_markup)
 
 async def inline_query(update: Update, context):
-    logger.info("Inline query received")
-    result = [InlineQueryResultGame(
+    logger.info(f"Inline query received: {update.inline_query.query}")
+    game_result = InlineQueryResultGame(
         id="0",
         game_short_name=GAME_SHORT_NAME
-    )]
-    await update.inline_query.answer(result)
+    )
+    logger.info(f"Answering inline query with game: {GAME_SHORT_NAME}")
+    await update.inline_query.answer([game_result], cache_time=1)
 
 async def callback_query(update: Update, context):
-    logger.info("Callback query received")
-    await update.callback_query.answer(url="https://rollingsloanetoken.github.io/telegram-app/")
+    query = update.callback_query
+    logger.info(f"Callback query received: {query.game_short_name}")
+    await query.answer(url=GAME_URL)
+    logger.info(f"Answered callback query with game URL: {GAME_URL}")
 
 def main():
     logger.info("Starting bot...")
