@@ -55,8 +55,8 @@
         <div class="modal-content">
             <h2>Game Over!</h2>
             <p>Your score: <span id="finalScore"></span></p>
-            <button class="modal-button" id="restartButton">Restart</button>
-            <button class="modal-button" id="shareButton">Share Score</button>
+            <button class="modal-button" id="restartButton">Retry</button>
+            <button class="modal-button" id="shareButton">Share Game</button>
         </div>
     </div>
 
@@ -91,8 +91,8 @@
         let dog = {
             x: 50,
             y: canvas.height / 2,
-            width: 0,  // Will be set in resizeCanvas
-            height: 0, // Will be set in resizeCanvas
+            width: 0,
+            height: 0,
             velocity: 0,
             lift: -5
         };
@@ -100,6 +100,7 @@
         let obstacles = [];
         let score = 0;
         let lastObstacleY = 0;
+        let gameActive = true;
         const gravity = 0.2;
         const obstacleSpeed = 2;
 
@@ -107,29 +108,27 @@
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             
-            // Adjust dog size based on canvas size
-            dog.width = canvas.width * 0.2;  // Increased from 0.15 to 0.2
+            dog.width = canvas.width * 0.2;
             dog.height = dog.width;
             dog.lift = -canvas.height * 0.015;
             
-            // Reposition dog if necessary
             if (dog.y + dog.height > canvas.height) {
                 dog.y = canvas.height - dog.height;
             }
         }
 
         function gameLoop() {
-            update();
-            draw();
+            if (gameActive) {
+                update();
+                draw();
+            }
             requestAnimationFrame(gameLoop);
         }
 
         function update() {
-            // Apply gravity
             dog.velocity += gravity;
             dog.y += dog.velocity;
 
-            // Keep dog within canvas
             if (dog.y > canvas.height - dog.height) {
                 dog.y = canvas.height - dog.height;
                 dog.velocity = 0;
@@ -139,12 +138,10 @@
                 dog.velocity = 0;
             }
 
-            // Generate obstacles
             if (obstacles.length === 0 || canvas.width - obstacles[obstacles.length - 1].x >= canvas.width * 0.4) {
                 obstacles.push(createObstacle());
             }
 
-            // Move and remove obstacles
             obstacles = obstacles.filter(obstacle => {
                 obstacle.x -= obstacleSpeed;
 
@@ -159,7 +156,6 @@
                 return true;
             });
 
-            // Check for collisions
             obstacles.forEach(obstacle => {
                 if (
                     dog.x < obstacle.x + obstacle.width &&
@@ -173,20 +169,16 @@
         }
 
         function draw() {
-            // Draw sky background
             ctx.drawImage(skyImage, 0, 0, canvas.width, canvas.height);
 
-            // Draw dog with improved quality
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(dogImage, dog.x, dog.y, dog.width, dog.height);
 
-            // Draw obstacles
             obstacles.forEach(obstacle => {
                 ctx.drawImage(obstacle.image, obstacle.x, obstacle.y, obstacle.width, obstacle.height);
             });
 
-            // Draw score
             ctx.fillStyle = 'white';
             ctx.font = `${canvas.width * 0.05}px Arial`;
             ctx.fillText('Score: ' + score, 10, 30);
@@ -218,6 +210,7 @@
         }
 
         function gameOver() {
+            gameActive = false;
             finalScoreSpan.textContent = score;
             scoreModal.style.display = 'block';
             if (isTelegram) {
@@ -231,30 +224,42 @@
             obstacles = [];
             score = 0;
             lastObstacleY = 0;
+            gameActive = true;
             scoreModal.style.display = 'none';
         }
 
-        function shareScore() {
+        function shareGame() {
+            const gameUrl = "https://rollingsloanetoken.github.io/telegram-app/";
+            const shareText = `Check out DogeFlyer! I scored ${score} points. Can you beat me? Play here: ${gameUrl}`;
+            
             if (isTelegram) {
                 TelegramGameProxy.shareScore();
+            } else if (navigator.share) {
+                navigator.share({
+                    title: 'DogeFlyer Game',
+                    text: shareText,
+                    url: gameUrl,
+                })
+                .then(() => console.log('Successful share'))
+                .catch((error) => console.log('Error sharing:', error));
             } else {
-                alert("Score sharing is only available in Telegram.");
+                // Fallback for browsers that don't support Web Share API
+                prompt("Copy this link to share the game:", gameUrl);
             }
         }
 
-        // Event listeners
         canvas.addEventListener('click', function() {
-            dog.velocity = dog.lift;
+            if (gameActive) {
+                dog.velocity = dog.lift;
+            }
         });
 
         restartButton.addEventListener('click', resetGame);
-        shareButton.addEventListener('click', shareScore);
+        shareButton.addEventListener('click', shareGame);
 
         window.addEventListener('resize', resizeCanvas);
 
-        // Initialize
         resizeCanvas();
-        // Start the game
         gameLoop();
     </script>
 </body>
