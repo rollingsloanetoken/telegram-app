@@ -2,28 +2,76 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Parachute Dog Game - Spaced Obstacles</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Parachute Dog Game</title>
     <style>
-        canvas {
-            border: 1px solid black;
-            display: block;
-            margin: 0 auto;
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
         }
-        #errorLog {
-            color: red;
-            margin-top: 10px;
+        #gameCanvas {
+            display: block;
+            touch-action: none;
+        }
+        #scoreModal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 300px;
             text-align: center;
+            border-radius: 10px;
+        }
+        .modal-button {
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
         }
     </style>
+    <script src="https://telegram.org/js/games.js"></script>
 </head>
 <body>
-    <canvas id="gameCanvas" width="300" height="500"></canvas>
-    <div id="errorLog"></div>
+    <canvas id="gameCanvas"></canvas>
+    <div id="scoreModal">
+        <div class="modal-content">
+            <h2>Game Over!</h2>
+            <p>Your score: <span id="finalScore"></span></p>
+            <button class="modal-button" id="restartButton">Restart</button>
+            <button class="modal-button" id="shareButton">Share Score</button>
+        </div>
+    </div>
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const errorLog = document.getElementById('errorLog');
+        const scoreModal = document.getElementById('scoreModal');
+        const finalScoreSpan = document.getElementById('finalScore');
+        const restartButton = document.getElementById('restartButton');
+        const shareButton = document.getElementById('shareButton');
+
+        // Set canvas size to fill the screen
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
         // Load images
         const dogImage = new Image();
@@ -32,66 +80,40 @@
         const skyImage = new Image();
         skyImage.src = 'sky.jpg';
 
-        // Load obstacle images
         const obstacleImages = [
             new Image(),
             new Image(),
             new Image()
         ];
-
         obstacleImages[0].src = 'Happy.png';
         obstacleImages[1].src = 'Angry.png';
         obstacleImages[2].src = 'Bored.png';
 
-        // Error handling for image loading
-        function handleImageError(e) {
-            errorLog.innerHTML += `Error loading image: ${e.target.src}<br>`;
-        }
-
-        dogImage.onerror = handleImageError;
-        skyImage.onerror = handleImageError;
-        obstacleImages.forEach(img => img.onerror = handleImageError);
-
         // Game variables
         let dog = {
             x: 50,
-            y: 250,
-            width: 80,
-            height: 80,
+            y: canvas.height / 2,
+            width: canvas.width * 0.15,
+            height: canvas.width * 0.15,
             velocity: 0,
-            lift: -3
+            lift: -5
         };
 
         let obstacles = [];
         let score = 0;
         let lastObstacleY = 0;
-
-        // Make sure all images are loaded before starting the game
-        let imagesLoaded = 0;
-        function imageLoaded() {
-            imagesLoaded++;
-            if (imagesLoaded === obstacleImages.length + 2) {
-                gameLoop();
-            }
-        }
-
-        obstacleImages.forEach(img => img.onload = imageLoaded);
-        dogImage.onload = imageLoaded;
-        skyImage.onload = imageLoaded;
+        const gravity = 0.2;
+        const obstacleSpeed = 2;
 
         function gameLoop() {
-            try {
-                update();
-                draw();
-                requestAnimationFrame(gameLoop);
-            } catch (error) {
-                errorLog.innerHTML += "Error in game loop: " + error.message + "<br>";
-            }
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
         }
 
         function update() {
-            // Apply lighter gravity
-            dog.velocity += 0.05;
+            // Apply gravity
+            dog.velocity += gravity;
             dog.y += dog.velocity;
 
             // Keep dog within canvas
@@ -104,16 +126,15 @@
                 dog.velocity = 0;
             }
 
-            // Generate obstacles with a minimum horizontal distance
-            if (obstacles.length === 0 || canvas.width - obstacles[obstacles.length - 1].x >= 200) {
+            // Generate obstacles
+            if (obstacles.length === 0 || canvas.width - obstacles[obstacles.length - 1].x >= canvas.width * 0.4) {
                 obstacles.push(createObstacle());
             }
 
             // Move and remove obstacles
             obstacles = obstacles.filter(obstacle => {
-                obstacle.x -= 2;
+                obstacle.x -= obstacleSpeed;
 
-                // Check if dog has passed the obstacle
                 if (!obstacle.passed && obstacle.x + obstacle.width < dog.x) {
                     obstacle.passed = true;
                     score++;
@@ -133,19 +154,14 @@
                     dog.y < obstacle.y + obstacle.height &&
                     dog.y + dog.height > obstacle.y
                 ) {
-                    alert('Game Over! Score: ' + score);
-                    resetGame();
+                    gameOver();
                 }
             });
         }
 
         function draw() {
-            // Clear canvas and draw sky background
+            // Draw sky background
             ctx.drawImage(skyImage, 0, 0, canvas.width, canvas.height);
-
-            // Set image smoothing
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
 
             // Draw dog
             ctx.drawImage(dogImage, dog.x, dog.y, dog.width, dog.height);
@@ -157,46 +173,23 @@
 
             // Draw score
             ctx.fillStyle = 'white';
-            ctx.font = '20px Arial';
+            ctx.font = `${canvas.width * 0.05}px Arial`;
             ctx.fillText('Score: ' + score, 10, 30);
         }
 
-        // Handle user input
-        canvas.addEventListener('click', function(event) {
-            dog.velocity = -3;  // Smaller upward velocity
-        });
-
-        // Reset game function
-        function resetGame() {
-            dog.x = 50;
-            dog.y = canvas.height / 2 - dog.height / 2;
-            dog.velocity = 0;
-            obstacles = [];
-            score = 0;
-            lastObstacleY = 0;
-        }
-
-        // Obstacle generation
         function createObstacle() {
             const randomImage = obstacleImages[Math.floor(Math.random() * obstacleImages.length)];
-            const size = Math.random() * 10 + 30;  // Random size between 30 and 40
+            const size = Math.random() * (canvas.height * 0.1) + (canvas.height * 0.05);
             
-            // Calculate the available vertical space
             const availableSpace = canvas.height - size;
-            
-            // Divide the screen into 3 vertical sections
             const sectionHeight = availableSpace / 3;
             
-            // Determine which section to place the obstacle in
             let section;
             do {
                 section = Math.floor(Math.random() * 3);
-            } while (Math.abs(section * sectionHeight - lastObstacleY) < sectionHeight);  // Ensure it's not in the same section as the last obstacle
+            } while (Math.abs(section * sectionHeight - lastObstacleY) < sectionHeight);
             
-            // Calculate the y position within the chosen section
             const y = section * sectionHeight + Math.random() * (sectionHeight - size);
-            
-            // Update the lastObstacleY
             lastObstacleY = y;
             
             return {
@@ -209,14 +202,40 @@
             };
         }
 
-        // Start the game when all images are loaded
-        // Fallback to start the game even if images don't load
-        setTimeout(() => {
-            if (imagesLoaded < obstacleImages.length + 2) {
-                errorLog.innerHTML += "Not all images loaded. Starting game anyway.<br>";
-                gameLoop();
-            }
-        }, 2000);
+        function gameOver() {
+            finalScoreSpan.textContent = score;
+            scoreModal.style.display = 'block';
+            setScore(score);
+        }
+
+        function resetGame() {
+            dog.y = canvas.height / 2;
+            dog.velocity = 0;
+            obstacles = [];
+            score = 0;
+            lastObstacleY = 0;
+            scoreModal.style.display = 'none';
+        }
+
+        // Telegram integration
+        function setScore(score) {
+            TelegramGameProxy.setScore(score);
+        }
+
+        function shareScore() {
+            TelegramGameProxy.shareScore();
+        }
+
+        // Event listeners
+        canvas.addEventListener('click', function() {
+            dog.velocity = dog.lift;
+        });
+
+        restartButton.addEventListener('click', resetGame);
+        shareButton.addEventListener('click', shareScore);
+
+        // Start the game
+        gameLoop();
     </script>
 </body>
 </html>
